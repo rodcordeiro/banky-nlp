@@ -1,0 +1,22 @@
+run = "pnpx start:dev"
+entrypoint = "src/main.ts"
+hidden = [".config", "pnpm-lock.yaml", ".upm", "node_modules/", "tsconfig.json"]
+modules = ["nodejs-20"]
+
+[nix]
+channel = "stable-24_05"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", ".config"]
+
+[deployment]
+run = ["tsx", "index.ts"]
+deploymentTarget = "cloudrun"
+ignorePorts = false
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[agent]
+expertMode = true
