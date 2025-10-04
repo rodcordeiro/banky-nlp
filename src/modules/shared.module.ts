@@ -3,9 +3,7 @@ import { Module } from '@nestjs/common';
 import { HealthModule } from '@/modules/health/health.module';
 
 @Module({
-  imports: [
-    HealthModule,
-  ],
+  imports: [HealthModule],
   controllers: [],
   providers: [],
 })

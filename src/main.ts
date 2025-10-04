@@ -65,8 +65,10 @@ async function bootstrap() {
    * ------------------------------------------------------
    */
   const config = new DocumentBuilder()
-    .setTitle('Banky API')
-    .setDescription('Banky RestAPI documentation and examples')
+    .setTitle('Banky NLP API')
+    .setDescription(
+      'Banky RestAPI for NLP processing documentation and examples',
+    )
     .setVersion(version)
     .addBearerAuth()
     .build();
@@ -75,7 +77,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('/swagger', app, document);
 
-  await app.listen(process.env.PORT || 5000, '0.0.0.0', (err, address) => {
+  await app.listen(process.env.PORT || 3333, '0.0.0.0', (err, address) => {
     if (err) {
       throw err;
     }

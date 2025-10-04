@@ -24,7 +24,7 @@ export const databaseProviders = [
         migrations: [migrationsPath],
         synchronize: false,
         migrationsRun: true,
-        migrationsTableName: 'bk_tb_migrations',
+        migrationsTableName: 'bknlp_tb_migrations',
         logging: true,
         name: 'database',
       });
