@@ -50,7 +50,7 @@
     "mysql": "^2.18.1",
     "@nestjs/config": "^3.3.0",
     "@nestjs/throttler": "^6.4.0",
-    "@nestjs/typeorm": "^10.0.2",
+    "@nestjs/typeorm": "^10.0.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
