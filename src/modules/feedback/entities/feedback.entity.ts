@@ -1,15 +1,8 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-} from 'typeorm';
+import { BaseEntity } from '@/common/entities/base.entity';
+import { Entity, Column } from 'typeorm';
 
 @Entity({ name: 'bk_nlp_feedback' })
-export class FeedbackEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class FeedbackEntity extends BaseEntity {
   @Column('text')
   originalText: string;
 
@@ -28,7 +21,4 @@ export class FeedbackEntity {
 
   @Column({ default: false })
   usedForTraining: boolean;
-
-  @CreateDateColumn()
-  createdAt: Date;
 }

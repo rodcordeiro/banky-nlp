@@ -1,20 +1,19 @@
 import natural from 'natural';
-import { AccountsEntity } from '../entities/account.entity';
 
 let classifier: natural.BayesClassifier | null = null;
-
-export function trainAccountClassifier(accounts: AccountsEntity[]) {
+const INTENTS = ['create', 'transfer'];
+export function trainIntentClassifier() {
   const bayes = new natural.BayesClassifier(natural.PorterStemmerPt);
 
-  accounts.forEach(acc => {
-    bayes.addDocument(acc.name.toLowerCase(), acc.name);
+  INTENTS.forEach(intent => {
+    bayes.addDocument(intent.toLowerCase(), intent);
   });
 
   bayes.train();
   classifier = bayes;
 }
 
-export function classifyAccount(text: string): string | null {
+export function classifyIntent(text: string): string | null {
   if (!classifier) throw new Error('Classifier not trained');
   return classifier.classify(text.toLowerCase());
 }

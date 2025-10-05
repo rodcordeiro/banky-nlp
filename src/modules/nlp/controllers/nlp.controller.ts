@@ -1,14 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { FeedbackService } from '../services/feedback.service';
+import { NlpService } from '../services/nlp.service';
 
-@ApiTags('feedback')
+@ApiTags('Nlp')
 @Controller({
   version: '1',
-  path: '/feedback',
+  path: '/nlp',
 })
-export class FeedbackController {
-  constructor(private readonly _service: FeedbackService) {}
+export class NlpController {
+  constructor(private readonly _service: NlpService) {}
 
   @Get()
   async index() {
