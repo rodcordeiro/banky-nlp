@@ -1,13 +1,18 @@
-import natural from 'natural';
+import { WordTokenizer, BayesClassifier, PorterStemmerPt } from 'natural';
 import { AccountsEntity } from '../entities/account.entity';
 
-let classifier: natural.BayesClassifier | null = null;
+let classifier: BayesClassifier | null = null;
+
+function preprocess(text: string): string {
+  const tokenizer = new WordTokenizer();
+  return tokenizer.tokenize(text.toLowerCase()).join(' ');
+}
 
 export function trainAccountClassifier(accounts: AccountsEntity[]) {
-  const bayes = new natural.BayesClassifier(natural.PorterStemmerPt);
+  const bayes = new BayesClassifier(PorterStemmerPt);
 
   accounts.forEach(acc => {
-    bayes.addDocument(acc.name.toLowerCase(), acc.name);
+    bayes.addDocument(preprocess(acc.name.toLowerCase()), acc.name);
   });
 
   bayes.train();

@@ -6,6 +6,11 @@ import { AccountsEntity } from '../entities/account.entity';
 import { UsersEntity } from '../entities/users.entity';
 import { FeedbackService } from '@/modules/feedback/services/feedback.service';
 
+import {
+  trainIntentClassifier,
+  classifyIntent,
+} from '../classifiers/intent.classifier';
+
 @Injectable()
 export class NlpService {
   private accountsCache: AccountsEntity[] = [];
@@ -30,7 +35,7 @@ export class NlpService {
 
     const lower = text.toLowerCase();
     const result: any = {};
-
+    result.intent = classifyIntent(text);
     // valor
     const valMatch = text.match(/(\d+[,.]?\d*)\s*(reais|rs|r\$)?/i);
     if (valMatch) result.value = parseFloat(valMatch[1].replace(',', '.'));
