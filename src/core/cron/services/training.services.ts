@@ -22,6 +22,7 @@ function mapFeedback(
     label: feedback.predictedJson[label] as string,
   };
 }
+
 /**
  * **Uncategorized**
  * List all transactions that received the inbound categories and are pending categorization
@@ -58,6 +59,26 @@ export class TrainingService {
       categories.map(i => ({ text: i.name, label: i.name })),
     );
 
+    const feedbacks = await this._feedbackService.getUntrainedFeedback(true);
+
+    if (feedbacks.length) {
+      await intentClassifier.train(
+        feedbacks.map(i => mapFeedback(i, 'intent')),
+      );
+
+      await accountsClassifier.train(
+        feedbacks.map(i => mapFeedback(i, 'account')),
+      );
+
+      await accountsClassifier.train(
+        feedbacks.map(i => mapFeedback(i, 'account')),
+      );
+
+      await categoriesClassifier.train(
+        feedbacks.map(i => mapFeedback(i, 'category')),
+      );
+    }
+
     const tests = [
       'Recebi 2500 de salário',
       'Pixei 200 para maria',
@@ -82,15 +103,25 @@ export class TrainingService {
 
     const intentClassifier = new IntentClassifier();
     const accountsClassifier = new AccountsClassifier();
+    const categoriesClassifier = new CategoryClassifier();
 
     const feedbacks = await this._feedbackService.getUntrainedFeedback();
     console.log({ feedbacks });
 
-    await intentClassifier.retrain(
-      feedbacks.map(i => mapFeedback(i, 'intent')),
-    );
-    await accountsClassifier.retrain(
+    if (!feedbacks.length) return;
+
+    await intentClassifier.train(feedbacks.map(i => mapFeedback(i, 'intent')));
+
+    await accountsClassifier.train(
       feedbacks.map(i => mapFeedback(i, 'account')),
+    );
+
+    await accountsClassifier.train(
+      feedbacks.map(i => mapFeedback(i, 'account')),
+    );
+
+    await categoriesClassifier.train(
+      feedbacks.map(i => mapFeedback(i, 'category')),
     );
 
     await this._feedbackService.markAsTrained(feedbacks);
