@@ -17,11 +17,16 @@ export class FeedbackService {
     const feedback = this._repository.create(payload);
     return await this._repository.save(feedback);
   }
-  async getUntrainedFeedback() {
+  async getUntrainedFeedback(all: boolean = false) {
+    const filter = { usedForTraining: false };
+    if (!all) {
+      filter['status'] = Not('pending');
+    }
     return await this._repository.find({
-      where: { usedForTraining: false, status: Not('pending') },
+      where: filter,
     });
   }
+
   async markAsTrained(feedbacks: FeedbackEntity[]) {
     await this._repository.save(
       feedbacks.map(i => ({ ...i, usedForTraining: true })),
