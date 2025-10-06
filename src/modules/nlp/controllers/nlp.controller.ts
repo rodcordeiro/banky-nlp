@@ -1,6 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { NlpService } from '../services/nlp.service';
+import { ProcessingDto } from '../dtos/processing.dto';
 
 @ApiTags('Nlp')
 @Controller({
@@ -13,5 +14,9 @@ export class NlpController {
   @Get()
   async index() {
     return await this._service.findAll();
+  }
+  @Post()
+  async process(@Body() payload: ProcessingDto) {
+    return this._service.extractEntities(payload.text);
   }
 }

@@ -1,21 +1,18 @@
+import { FeedbackService } from '@/modules/feedback/services/feedback.service';
 import { CategoriesEntity } from '@/modules/nlp/entities/category.entity';
 import { Inject, Injectable } from '@nestjs/common';
 import chrono from 'chrono-node';
 import { Repository } from 'typeorm';
 import { AccountsEntity } from '../entities/account.entity';
 import { UsersEntity } from '../entities/users.entity';
-import { FeedbackService } from '@/modules/feedback/services/feedback.service';
 
-import {
-  trainIntentClassifier,
-  classifyIntent,
-} from '../classifiers/intent.classifier';
+import { IntentClassifier } from '../classifiers/intent.classifier';
 
 @Injectable()
 export class NlpService {
   private accountsCache: AccountsEntity[] = [];
   private categoriesCache: CategoriesEntity[] = [];
-
+  private intentProcessor: IntentClassifier;
   constructor(
     @Inject('CATEGORY_REPOSITORY')
     private readonly _categoriesRepository: Repository<CategoriesEntity>,
@@ -24,7 +21,9 @@ export class NlpService {
     @Inject('USER_REPOSITORY')
     private readonly _usersRepository: Repository<UsersEntity>,
     private readonly _feedbackService: FeedbackService,
-  ) {}
+  ) {
+    this.intentProcessor = new IntentClassifier();
+  }
 
   async findAll() {
     return this._categoriesRepository.find();
@@ -35,7 +34,7 @@ export class NlpService {
 
     const lower = text.toLowerCase();
     const result: any = {};
-    result.intent = classifyIntent(text);
+    result.intent = this.intentProcessor.classify(text);
     // valor
     const valMatch = text.match(/(\d+[,.]?\d*)\s*(reais|rs|r\$)?/i);
     if (valMatch) result.value = parseFloat(valMatch[1].replace(',', '.'));

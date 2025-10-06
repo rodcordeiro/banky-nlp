@@ -1,6 +1,6 @@
+import { IntentClassifier } from '@/modules/nlp/classifiers/intent.classifier';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { classifyText, classifyWithScores, trainIntentClassifier } from '@/modules/nlp/classifiers/intent.classifier';
 
 /**
  * **Uncategorized**
@@ -14,9 +14,10 @@ export class TrainingService {
     this._logger.log('TrainingService Initialized');
   }
 
-  @Cron('0/30 * * * * *')
+  // @Cron('0/30 * * * * *')
+  @Cron('0 * * * * *')
   train() {
-    trainIntentClassifier();
+    const classifier = new IntentClassifier();
     const tests = [
       'Recebi 2500 de salário',
       'Pixei 200 para maria',
@@ -27,12 +28,12 @@ export class TrainingService {
     ];
 
     for (const t of tests) {
-      console.log(`"${t}" -> ${classifyText(t)}`);
-      console.log(classifyWithScores(t)); // debug com probabilidades
+      console.log(`"${t}" -> ${classifier.classify(t)}`);
+      // console.log(classifyWithScores(t)); // debug com probabilidades
     }
   }
-  @Cron('0/30 * * * * *')
-  // @Cron('0 0 0 * * *')
+
+  @Cron('0 0 0 * * *')
   retrain() {
     this._logger.verbose('Starting Uncategorized service');
 

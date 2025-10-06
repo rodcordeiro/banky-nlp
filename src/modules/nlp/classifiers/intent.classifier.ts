@@ -1,11 +1,5 @@
+import { BaseClassifier } from '@/common/classifiers/base.classifier';
 import { WordTokenizer, BayesClassifier, PorterStemmerPt } from 'natural';
-
-let classifier: BayesClassifier | null = null;
-
-function preprocess(text: string): string {
-  const tokenizer = new WordTokenizer();
-  return tokenizer.tokenize(text.toLowerCase()).join(' ');
-}
 
 // --- Dataset inicial (mais robusto) ---
 const trainingData: { text: string; label: string }[] = [
@@ -32,29 +26,9 @@ const trainingData: { text: string; label: string }[] = [
   },
   { text: 'Transfere 80 pro banco inter', label: 'transfer' },
 ];
-
-export function trainIntentClassifier() {
-  const bayes = new BayesClassifier(PorterStemmerPt);
-
-  // --- Alimentar o classificador ---
-  for (const sample of trainingData) {
-    bayes.addDocument(preprocess(sample.text), sample.label);
+export class IntentClassifier extends BaseClassifier {
+  constructor() {
+    super();
+    this.init({ samples: trainingData });
   }
-
-  bayes.train();
-  classifier = bayes;
-}
-
-export function classifyText(text: string): string {
-  if (!classifier) throw new Error('Classifier not trained');
-  return classifier.classify(preprocess(text));
-}
-
-export function classifyWithScores(text: string) {
-  if (!classifier) throw new Error('Classifier not trained');
-  return classifier.getClassifications(preprocess(text));
-}
-export function classifyIntent(text: string): string | null {
-  if (!classifier) throw new Error('Classifier not trained');
-  return classifier.classify(text.toLowerCase());
 }
