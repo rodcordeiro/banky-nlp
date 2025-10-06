@@ -1,4 +1,3 @@
-import { CategoriesEntity } from '@/modules/nlp/entities/category.entity';
 import { Inject, Injectable } from '@nestjs/common';
 import { Not, Repository } from 'typeorm';
 import { FeedbackEntity } from '../entities/feedback.entity';
