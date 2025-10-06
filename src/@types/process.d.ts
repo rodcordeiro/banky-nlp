@@ -21,6 +21,15 @@ declare global {
       readonly DB_NAME: string;
     }
   }
+  export interface ProcessingResult {
+    intent?: string;
+    account?: string;
+    origin?: string;
+    destiny?: string;
+    category?: string;
+    date?: string;
+    value?: number;
+  }
 }
 
 export {};

@@ -17,6 +17,6 @@ export class NlpController {
   }
   @Post()
   async process(@Body() payload: ProcessingDto) {
-    return this._service.extractEntities(payload.text);
+    return this._service.parse(payload.text);
   }
 }

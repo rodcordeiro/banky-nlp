@@ -1,7 +1,7 @@
 import { BaseClassifier } from '@/common/classifiers/base.classifier';
 
-export class IntentClassifier extends BaseClassifier {
+export class CategoryClassifier extends BaseClassifier {
   constructor() {
-    super('intent.model');
+    super('category.model');
   }
 }

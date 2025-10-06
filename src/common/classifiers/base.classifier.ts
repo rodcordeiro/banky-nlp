@@ -1,4 +1,7 @@
 import { BayesClassifier, PorterStemmerPt, WordTokenizer } from 'natural';
+import fs from 'fs';
+import path from 'path';
+
 export interface TrainingSample {
   text: string;
   label: string;
@@ -6,35 +9,83 @@ export interface TrainingSample {
 
 export class BaseClassifier {
   public classifier: BayesClassifier | null = null;
-  private tokenizer: WordTokenizer;
+  private tokenizer = new WordTokenizer();
+  private model: string;
 
-  init({ samples }: { samples?: TrainingSample[] }) {
-    if (this.classifier != null) {
+  constructor(model: string) {
+    this.model = model;
+  }
+
+  private getModelPath(): string {
+    return path.join('src/common/classifiers/models', `${this.model}.json`);
+  }
+
+  async init(): Promise<BayesClassifier> {
+    if (this.classifier) return this.classifier;
+
+    const modelPath = this.getModelPath();
+
+    if (fs.existsSync(modelPath)) {
+      // Carrega o modelo já treinado
+      return new Promise((resolve, reject) => {
+        BayesClassifier.load(modelPath, PorterStemmerPt, (err, classifier) => {
+          if (err) return reject(err);
+          this.classifier = classifier ?? null;
+          resolve(classifier!);
+        });
+      });
+    } else {
+      // Cria um novo se não existir
+      this.classifier = new BayesClassifier(PorterStemmerPt);
       return this.classifier;
     }
-    this.classifier = new BayesClassifier(PorterStemmerPt);
-    this.tokenizer = new WordTokenizer();
-    this.train(samples!);
   }
 
   preprocess(text: string): string {
     return this.tokenizer.tokenize(text.toLowerCase()).join(' ');
   }
 
-  classify(text: string): string {
-    if (!this.classifier) throw new Error('Classifier not trained');
-    return this.classifier.classify(this.preprocess(text.toLowerCase()));
+  async classify(text: string): Promise<string> {
+    if (!this.classifier) await this.init();
+    return this.classifier!.classify(this.preprocess(text));
   }
-  train(samples: TrainingSample[]) {
-    if (!this.classifier) return;
 
-    const bayes = this.classifier;
+  async train(samples?: TrainingSample[]): Promise<void> {
+    const classifier = await this.init();
 
-    for (const sample of samples) {
-      bayes.addDocument(this.preprocess(sample.text), sample.label);
+    for (const sample of samples ?? []) {
+      classifier.addDocument(this.preprocess(sample.text), sample.label);
     }
 
-    bayes.train();
-    this.classifier = bayes;
+    classifier.train();
+
+    await this.save();
+  }
+
+  /**
+   * Re-treina incrementalmente com novos exemplos (ex: feedback)
+   */
+  async retrain(newSamples: TrainingSample[]): Promise<void> {
+    console.log(`🔁 Re-treinando modelo '${this.model}' com feedback...`);
+    const classifier = await this.init();
+
+    for (const sample of newSamples) {
+      classifier.addDocument(this.preprocess(sample.text), sample.label);
+    }
+
+    classifier.train();
+    await this.save();
+    console.log(`✅ Re-treinamento concluído: ${this.model}`);
+  }
+
+  private save(): Promise<void> {
+    const modelPath = this.getModelPath();
+    return new Promise((resolve, reject) => {
+      this.classifier!.save(modelPath, err => {
+        if (err) reject(err);
+        console.log(`✅ Modelo '${this.model}' salvo em ${modelPath}`);
+        resolve();
+      });
+    });
   }
 }

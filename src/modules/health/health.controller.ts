@@ -22,7 +22,7 @@ export class HealthController {
   @HealthCheck()
   check() {
     return this._health.check([
-      async (): Promise<HealthIndicatorResult> => ({
+      (): HealthIndicatorResult => ({
         version: { status: 'up', value: version },
       }),
       async () => this._memory.checkHeap('memory_heap', 200 * 1024 * 1024),

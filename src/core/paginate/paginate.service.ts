@@ -63,6 +63,7 @@ export class PaginationService {
       });
     }
 
+    // eslint-disable-next-line @typescript-eslint/await-thenable
     const [items, total] = await Promise.all(promises);
     const totalPages = Math.ceil(items.length / limit) || 1;
     return {

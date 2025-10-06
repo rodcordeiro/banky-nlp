@@ -7,10 +7,10 @@ export class FeedbackEntity extends BaseEntity {
   originalText: string;
 
   @Column('simple-json')
-  predictedJson: any;
+  predictedJson: ProcessingResult;
 
   @Column('simple-json', { nullable: true })
-  userCorrectedJson: any;
+  userCorrectedJson: ProcessingResult;
 
   @Column({
     type: 'enum',
