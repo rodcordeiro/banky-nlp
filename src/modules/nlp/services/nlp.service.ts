@@ -28,7 +28,7 @@ export class NlpService {
   }
 
   async findAll() {
-    return this._categoriesRepository.find();
+    return (await this._accountsRepository.find()).map(i => i.name);
   }
   async extractEntities(text: string) {
     const result: ProcessingResult = {};
@@ -36,10 +36,40 @@ export class NlpService {
 
     if (result.intent === 'transfer') {
       result.origin = await this.accountProcessor.classify(text);
-      result.destiny = await this.accountProcessor.classify(text);
+      if (result.origin)
+        result.originId = (
+          await this._accountsRepository.findOne({
+            where: { name: result.origin },
+          })
+        )?.id;
+
+      // Adiciona um separador para classificar o destino
+      const remainingTextForDestiny = text.replace(result.origin, '').trim();
+      result.destiny = await this.accountProcessor.classify(
+        remainingTextForDestiny,
+      );
+      if (result.destiny)
+        result.destinyId = (
+          await this._accountsRepository.findOne({
+            where: { name: result.destiny },
+          })
+        )?.id;
     } else {
       result.account = await this.accountProcessor.classify(text);
+      if (result.account)
+        result.accountId = (
+          await this._accountsRepository.findOne({
+            where: { name: result.account },
+          })
+        )?.id;
+
       result.category = await this.categoriesProcessor.classify(text);
+      if (result.category)
+        result.categoryId = (
+          await this._categoriesRepository.findOne({
+            where: { name: result.category },
+          })
+        )?.id;
     }
 
     // valor
@@ -52,13 +82,14 @@ export class NlpService {
 
     return result;
   }
+
   async parse(text: string) {
     const parsed = await this.extractEntities(text);
-    await this._feedbackService.save({
+    const feedback = await this._feedbackService.save({
       originalText: text,
       predictedJson: parsed,
     });
-    return parsed;
+    return { ...parsed, feedback: feedback.id };
   }
 
   public async loadAccountDictionaries() {

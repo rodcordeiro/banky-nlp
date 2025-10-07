@@ -1,5 +1,3 @@
-import { TrainingSample } from '@/common/classifiers/base.classifier';
-import { FeedbackEntity } from '@/modules/feedback/entities/feedback.entity';
 import { FeedbackService } from '@/modules/feedback/services/feedback.service';
 import { AccountsClassifier } from '@/modules/nlp/classifiers/account.classifier';
 import { CategoryClassifier } from '@/modules/nlp/classifiers/category.classifier';
@@ -7,21 +5,6 @@ import { IntentClassifier } from '@/modules/nlp/classifiers/intent.classifier';
 import { NlpService } from '@/modules/nlp/services/nlp.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-
-function mapFeedback(
-  feedback: FeedbackEntity,
-  label: keyof ProcessingResult,
-): TrainingSample {
-  if (feedback.userCorrectedJson)
-    return {
-      text: feedback.originalText,
-      label: feedback.userCorrectedJson[label] as string,
-    };
-  return {
-    text: feedback.originalText,
-    label: feedback.predictedJson[label] as string,
-  };
-}
 
 /**
  * **Uncategorized**
@@ -38,8 +21,8 @@ export class TrainingService {
     this._logger.log('TrainingService Initialized');
   }
 
-  // @Cron('0/15 * * * * *', { waitForCompletion: true })
-  @Cron('0 0 0 * * *', { waitForCompletion: true })
+  @Cron('0/30 * * * * *', { waitForCompletion: true })
+  // @Cron('0 0 0 * * *', { waitForCompletion: true })
   async train() {
     this._logger.verbose('Starting training service');
 
@@ -59,25 +42,7 @@ export class TrainingService {
       categories.map(i => ({ text: i.name, label: i.name })),
     );
 
-    const feedbacks = await this._feedbackService.getUntrainedFeedback(true);
-
-    if (feedbacks.length) {
-      await intentClassifier.train(
-        feedbacks.map(i => mapFeedback(i, 'intent')),
-      );
-
-      await accountsClassifier.train(
-        feedbacks.map(i => mapFeedback(i, 'account')),
-      );
-
-      await accountsClassifier.train(
-        feedbacks.map(i => mapFeedback(i, 'account')),
-      );
-
-      await categoriesClassifier.train(
-        feedbacks.map(i => mapFeedback(i, 'category')),
-      );
-    }
+    await this._feedbackService.trainClassifiers();
 
     const tests = [
       'Recebi 2500 de salário',
@@ -100,30 +65,6 @@ export class TrainingService {
   // @Cron('0/10 * * * * *', { waitForCompletion: true })
   async retrain() {
     this._logger.verbose('Starting retraining service');
-
-    const intentClassifier = new IntentClassifier();
-    const accountsClassifier = new AccountsClassifier();
-    const categoriesClassifier = new CategoryClassifier();
-
-    const feedbacks = await this._feedbackService.getUntrainedFeedback();
-    console.log({ feedbacks });
-
-    if (!feedbacks.length) return;
-
-    await intentClassifier.train(feedbacks.map(i => mapFeedback(i, 'intent')));
-
-    await accountsClassifier.train(
-      feedbacks.map(i => mapFeedback(i, 'account')),
-    );
-
-    await accountsClassifier.train(
-      feedbacks.map(i => mapFeedback(i, 'account')),
-    );
-
-    await categoriesClassifier.train(
-      feedbacks.map(i => mapFeedback(i, 'category')),
-    );
-
-    await this._feedbackService.markAsTrained(feedbacks);
+    await this._feedbackService.trainClassifiers();
   }
 }

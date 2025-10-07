@@ -9,7 +9,7 @@ export interface TrainingSample {
 
 export class BaseClassifier {
   public classifier: BayesClassifier | null = null;
-  private tokenizer = new WordTokenizer();
+  private _tokenizer = new WordTokenizer();
   private model: string;
 
   constructor(model: string) {
@@ -42,7 +42,12 @@ export class BaseClassifier {
   }
 
   preprocess(text: string): string {
-    return this.tokenizer.tokenize(text.toLowerCase()).join(' ');
+    // return this._tokenizer.tokenize(text.toLowerCase()).join(' ');
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s\*\.]/g, '') // mantém ** e .
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   async classify(text: string): Promise<string> {
