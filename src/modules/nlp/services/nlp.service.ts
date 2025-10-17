@@ -8,6 +8,7 @@ import { AccountsEntity } from '../entities/account.entity';
 import { IntentClassifier } from '../classifiers/intent.classifier';
 import { AccountsClassifier } from '../classifiers/account.classifier';
 import { CategoryClassifier } from '../classifiers/category.classifier';
+import { TrainingSample } from '@/common/classifiers/base.classifier';
 
 @Injectable()
 export class NlpService {
@@ -99,5 +100,11 @@ export class NlpService {
   public async loadCategoryDictionaries() {
     const categories = await this._categoriesRepository.find();
     return categories;
+  }
+  public async addCategoriesTrainnings(data: TrainingSample[]) {
+    return await this.categoriesProcessor.train(data);
+  }
+  public async addAccountsTrainnings(data: TrainingSample[]) {
+    return await this.accountProcessor.train(data);
   }
 }

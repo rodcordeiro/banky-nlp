@@ -34,6 +34,9 @@ export class FeedbackService {
       },
       {
         where: filters as FindOptionsWhere<FeedbackEntity>,
+        order: {
+          createdAt: 'DESC',
+        }
       } as unknown as FindManyOptions<FeedbackEntity>,
     );
   }

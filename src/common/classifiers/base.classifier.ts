@@ -1,4 +1,4 @@
-import { BayesClassifier, PorterStemmerPt, WordTokenizer } from 'natural';
+import { BayesClassifier, PorterStemmerPt } from 'natural';
 import fs from 'fs';
 import path from 'path';
 
@@ -9,7 +9,6 @@ export interface TrainingSample {
 
 export class BaseClassifier {
   public classifier: BayesClassifier | null = null;
-  private _tokenizer = new WordTokenizer();
   private model: string;
 
   constructor(model: string) {
