@@ -49,7 +49,7 @@ export class BaseClassifier {
       .trim();
   }
 
-  async classify(text: string): Promise<string> {
+  async classify(text: string): Promise<string | number | null> {
     if (!this.classifier) await this.init();
     return this.classifier!.classify(this.preprocess(text));
   }

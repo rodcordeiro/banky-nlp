@@ -7,12 +7,14 @@ import { IntentClassifier } from '@/modules/nlp/classifiers/intent.classifier';
 import { CategoryClassifier } from '@/modules/nlp/classifiers/category.classifier';
 import { mapFeedback } from '@/common/utils/feedback.util';
 import { PaginationService } from '@/core/paginate/paginate.service';
+import { ValueClassifier } from '@/modules/nlp/classifiers/value.classifier';
 
 @Injectable()
 export class FeedbackService {
   private intentProcessor: IntentClassifier;
   private accountProcessor: AccountsClassifier;
   private categoriesProcessor: CategoryClassifier;
+  private valuesProcessor: ValueClassifier;
 
   constructor(
     @Inject('FEEDBACK_REPOSITORY')
@@ -22,6 +24,7 @@ export class FeedbackService {
     this.intentProcessor = new IntentClassifier();
     this.accountProcessor = new AccountsClassifier();
     this.categoriesProcessor = new CategoryClassifier();
+    this.valuesProcessor = new ValueClassifier();
   }
 
   async findAll(queries: SearchFeedbackDto) {
@@ -36,22 +39,22 @@ export class FeedbackService {
         where: filters as FindOptionsWhere<FeedbackEntity>,
         order: {
           createdAt: 'DESC',
-        }
+        },
       } as unknown as FindManyOptions<FeedbackEntity>,
     );
   }
+
   async save(payload: Partial<FeedbackEntity>) {
     const feedback = this._repository.create(payload);
     return await this._repository.save(feedback);
   }
+
   async getUntrainedFeedback(all: boolean = false) {
     const filter = {};
 
     if (!all) {
       filter['status'] = Not('pending');
       filter['usedForTraining'] = false;
-    } else {
-      filter['usedForTraining'] = true;
     }
 
     return await this._repository.find({
@@ -64,32 +67,48 @@ export class FeedbackService {
       feedbacks.map(i => ({ ...i, usedForTraining: true })),
     );
   }
-  async trainClassifiers() {
-    const feedbacks = await this.getUntrainedFeedback();
-    console.log({ feedbacks });
+  async trainClassifiers(fullTraining?: boolean) {
+    const { feeds, intents, categories, accounts, origin, destiny, values } =
+      await this.getUntrainedFeedback(fullTraining).then(feeds => {
+        // console.debug({ feeds });
+        const intents = feeds.map(i => mapFeedback(i, 'intent'));
+        const categories = feeds.map(i => mapFeedback(i, 'category'));
+        const accounts = feeds.map(i => mapFeedback(i, 'account'));
+        const origin = feeds.map(i => mapFeedback(i, 'origin'));
+        const destiny = feeds.map(i => mapFeedback(i, 'destiny'));
+        const values = feeds.map(i => ({
+          text: i.originalText,
+          label: (
+            i.userCorrectedJson?.value ??
+            i.predictedJson?.value ??
+            0
+          )?.toString(),
+        }));
+        return {
+          feeds,
+          intents,
+          categories,
+          accounts,
+          origin,
+          destiny,
+          values,
+        };
+      });
 
-    if (!feedbacks.length) return;
+    if (!feeds.length) return;
 
-    await this.intentProcessor.train(
-      feedbacks.map(i => mapFeedback(i, 'intent')),
-    );
+    await this.intentProcessor.train(intents);
 
-    await this.accountProcessor.train(
-      feedbacks.map(i => mapFeedback(i, 'account')),
-    );
-    if (feedbacks.some(i => i.predictedJson.intent === 'transfer')) {
-      await this.accountProcessor.train(
-        feedbacks.map(i => mapFeedback(i, 'origin')),
-      );
-      await this.accountProcessor.train(
-        feedbacks.map(i => mapFeedback(i, 'destiny')),
-      );
+    await this.accountProcessor.train(accounts);
+
+    if (origin.length) {
+      await this.accountProcessor.train(origin);
+      await this.accountProcessor.train(destiny);
     }
 
-    await this.categoriesProcessor.train(
-      feedbacks.map(i => mapFeedback(i, 'category')),
-    );
+    await this.categoriesProcessor.train(categories);
+    await this.valuesProcessor.train(values);
 
-    await this.markAsTrained(feedbacks);
+    await this.markAsTrained(feeds);
   }
 }
