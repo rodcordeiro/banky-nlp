@@ -35,6 +35,7 @@ export default tseslint.config(
       '@typescript-eslint/interface-name-prefix': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
+      'no-useless-escape': 'warn',
       '@typescript-eslint/no-namespace': 'off',
       'no-unused-vars': [
         'warn',

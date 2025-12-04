@@ -40,32 +40,44 @@ export class PaginationService {
       throw new Error(error);
     }
   }
+  private parseQueriableParams<T extends ObjectLiteral>(
+    options?: FindManyOptions<T>,
+  ) {
+    if (!options) return {};
+    return Object.fromEntries(
+      Object.entries(options).filter(
+        ([key, _]) => key !== 'limit' && key !== 'page',
+      ),
+    );
+  }
 
   public async paginate<T extends ObjectLiteral>(
     entityRepository: Repository<T>,
     options: IPaginationOptions,
     searchOptions?: FindManyOptions<T>,
   ): Promise<Pagination<T>> {
-    const { limit, page, countQueries } = this.resolveOptions(options);
-
-    const promises: [Promise<T[]>, Promise<number> | undefined] = [
+    const { limit, page } = this.resolveOptions(options);
+    console.log({ limit, page });
+    const promises: [Promise<T[]>, Promise<number>] = [
       entityRepository.find({
         skip: limit * (page - 1),
         take: limit,
         ...searchOptions,
       }),
-      undefined,
+
+      entityRepository.count({
+        ...this.parseQueriableParams(searchOptions),
+      }),
     ];
+    console.log('here');
+    // if (countQueries) {
+    //   promises[1] = entityRepository.count({
+    //     ...searchOptions,
+    //   });
+    // }
 
-    if (countQueries) {
-      promises[1] = entityRepository.count({
-        ...searchOptions,
-      });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/await-thenable
     const [items, total] = await Promise.all(promises);
-    const totalPages = Math.ceil(items.length / limit) || 1;
+    const totalPages = Math.ceil(total / limit) || 1;
     return {
       items,
       meta: {

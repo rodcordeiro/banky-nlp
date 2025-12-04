@@ -24,9 +24,13 @@ declare global {
   export interface ProcessingResult {
     intent?: string;
     account?: string;
+    accountId?: string;
     origin?: string;
+    originId?: string;
     destiny?: string;
+    destinyId?: string;
     category?: string;
+    categoryId?: string;
     date?: string;
     value?: number;
   }

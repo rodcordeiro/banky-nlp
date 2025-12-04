@@ -1,4 +1,4 @@
-import { BayesClassifier, PorterStemmerPt, WordTokenizer } from 'natural';
+import { BayesClassifier, PorterStemmerPt } from 'natural';
 import fs from 'fs';
 import path from 'path';
 
@@ -9,7 +9,6 @@ export interface TrainingSample {
 
 export class BaseClassifier {
   public classifier: BayesClassifier | null = null;
-  private tokenizer = new WordTokenizer();
   private model: string;
 
   constructor(model: string) {
@@ -42,10 +41,15 @@ export class BaseClassifier {
   }
 
   preprocess(text: string): string {
-    return this.tokenizer.tokenize(text.toLowerCase()).join(' ');
+    // return this._tokenizer.tokenize(text.toLowerCase()).join(' ');
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s\*\.]/g, '') // mantém ** e .
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
-  async classify(text: string): Promise<string> {
+  async classify(text: string): Promise<string | number | null> {
     if (!this.classifier) await this.init();
     return this.classifier!.classify(this.preprocess(text));
   }
