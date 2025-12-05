@@ -14,4 +14,16 @@ export class SearchFeedbackDto {
     type: 'string',
   })
   id?: string;
+  /**
+   *Limite data of the paginate transactions.
+   *@example 100
+   */
+  @ApiPropertyOptional()
+  limit?: number;
+  /**
+   *Current page of the paginate transactions.
+   *@example 1
+   */
+  @ApiPropertyOptional()
+  page?: number;
 }

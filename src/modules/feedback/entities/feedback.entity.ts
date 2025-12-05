@@ -17,7 +17,7 @@ export class FeedbackEntity extends BaseEntity {
     enum: ['pending', 'validated', 'corrected'],
     default: 'pending',
   })
-  status: 'pending' | 'validated' | 'corrected';
+  status: 'pending' | 'validated' | 'corrected' = 'pending';
 
   @Column({ default: false })
   usedForTraining: boolean;

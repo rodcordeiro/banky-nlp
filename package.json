@@ -1,6 +1,6 @@
 {
   "name": "@rodcordeiro/banky-nlp",
-  "version": "0.0.1",
+  "version": "1.1.0",
   "description": "",
   "author": "Rodrigo Cordeiro (http://rodcordeiro.com.br) <rodrigomendoncca@gmail.com>",
   "private": true,
@@ -52,7 +52,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.27",
-    "zod": "^4.1.11"
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

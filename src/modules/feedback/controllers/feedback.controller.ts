@@ -25,4 +25,8 @@ export class FeedbackController {
       id,
     } as unknown as Partial<FeedbackEntity>);
   }
+  @Post('/training')
+  async train() {
+    return await this._service.trainClassifiers();
+  }
 }
