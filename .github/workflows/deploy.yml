@@ -48,7 +48,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: rodcordeiro/banky-api:latest,rodcordeiro/banky-api:${{ steps.version.outputs.PKG_VERSION }}
+          tags: rodcordeiro/banky-nlpapi:latest,rodcordeiro/banky-nlpapi:${{ steps.version.outputs.PKG_VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
       
   
