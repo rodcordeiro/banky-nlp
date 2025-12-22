@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@fastify/compress':
-        specifier: ^8.1.0
-        version: 8.1.0
+        specifier: ^8.3.0
+        version: 8.3.0
       '@fastify/csrf-protection':
         specifier: ^7.1.0
         version: 7.1.0
@@ -424,8 +424,8 @@ packages:
   '@fastify/ajv-compiler@4.0.2':
     resolution: {integrity: sha512-Rkiu/8wIjpsf46Rr+Fitd3HRP+VsxUFDDeag0hs9L0ksfnwx2g7SPQQTFL0E8Qv+rfXzQOxBJnjUB9ITUDjfWQ==}
 
-  '@fastify/compress@8.1.0':
-    resolution: {integrity: sha512-wX3I5u/SYQXxbqjG7CysvzeaCe4Sv8y13MnvnaGTpqfKkJbTLpwvdIDgqrwp/+UGvXOW7OLDLoTAQCDMJJRjDQ==}
+  '@fastify/compress@8.3.0':
+    resolution: {integrity: sha512-zYp6SCa7nJMxAse8+TXWNF0l0xV9K9GeMFwdr0aESAKfCEGo7N96b5vjFDFEz/pg8eyo1Am1B249UX79mS3x9A==}
 
   '@fastify/cookie@11.0.2':
     resolution: {integrity: sha512-GWdwdGlgJxyvNv+QcKiGNevSspMQXncjMZ1J8IvuDQk0jvkzgWWZFNC2En3s+nHndZBGV8IbLwOI/sxCZw/mzA==}
@@ -4390,7 +4390,7 @@ snapshots:
       ajv-formats: 3.0.1(ajv@8.17.1)
       fast-uri: 3.1.0
 
-  '@fastify/compress@8.1.0':
+  '@fastify/compress@8.3.0':
     dependencies:
       '@fastify/accept-negotiator': 2.0.1
       fastify-plugin: 5.1.0
