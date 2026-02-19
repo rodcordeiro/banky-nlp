@@ -1,8 +1,7 @@
-# AGENTS.md
+﻿# AGENTS.md
 
 ## Escopo
 Este guia vale apenas para `banky-nlp` (API de NLP).
-
 Antes de editar, confirme se a tarefa pertence a este projeto e nao ao `banky_api` ou `banky_app`.
 
 ## Stack e Estrutura
@@ -29,7 +28,7 @@ Execute dentro de `banky-nlp/`.
 
 ## Integracoes e Observacoes
 - Existe integracao RabbitMQ no codigo, mas `RabbitModule` esta comentado em `src/app.module.ts`.
-- Ao alterar contratos de NLP (rotas/DTO/schema), alinhar consumidores impactados.
+- Ao alterar contrato de NLP (rota/DTO/schema), alinhar consumidores impactados.
 
 ## Diretrizes de Mudanca
 - Nao editar `dist/`, `node_modules/` ou arquivos gerados.
@@ -43,4 +42,4 @@ Execute dentro de `banky-nlp/`.
 4. Comitar seguindo o padrao de commit adotado no repositorio.
 
 ## Referencia Cruzada
-Para regras gerais do workspace, seguir tambem `../AGENTS.md`.
+Seguir tambem as regras gerais em `../AGENTS.md`.
