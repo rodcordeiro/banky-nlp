@@ -7,11 +7,13 @@ export function mapFeedback(
 ): TrainingSample {
   if (feedback.userCorrectedJson)
     return {
-      text: feedback.originalText,
-      label: feedback.userCorrectedJson[label] as string,
+      text: feedback.originalText.toLowerCase(),
+      label: feedback.userCorrectedJson[label]
+        ?.toString()
+        .toLowerCase() as string,
     };
   return {
-    text: feedback.originalText,
-    label: feedback.predictedJson[label] as string,
+    text: feedback.originalText.toLowerCase(),
+    label: feedback.predictedJson[label]?.toString().toLowerCase() as string,
   };
 }

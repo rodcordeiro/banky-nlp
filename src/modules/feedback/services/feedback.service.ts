@@ -1,4 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { FindManyOptions, FindOptionsWhere, Not, Repository } from 'typeorm';
 import { FeedbackEntity } from '../entities/feedback.entity';
 import { SearchFeedbackDto } from '../dtos/search.dto';
@@ -45,6 +50,28 @@ export class FeedbackService {
   }
 
   async save(payload: Partial<FeedbackEntity>) {
+    if (payload.id) {
+      const existing = await this._repository.findOne({
+        where: { id: payload.id },
+      });
+
+      if (!existing) {
+        throw new NotFoundException('Feedback nao encontrado para aprovacao.');
+      }
+
+      const feedback = this._repository.create({
+        ...existing,
+        ...payload,
+      });
+      return await this._repository.save(feedback);
+    }
+
+    if (!payload.originalText || !payload.predictedJson) {
+      throw new BadRequestException(
+        'originalText e predictedJson sao obrigatorios para criar feedback.',
+      );
+    }
+
     const feedback = this._repository.create(payload);
     return await this._repository.save(feedback);
   }
