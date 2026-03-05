@@ -108,7 +108,11 @@ export class NlpService {
 
     // data
     const dateParsed = pt.parseDate(text);
-    if (dateParsed) result.date = dateParsed.toISOString();
+    if (dateParsed) {
+      result.date = dateParsed.toISOString();
+    } else {
+      result.date = new Date().toISOString();
+    }
 
     return result;
   }
