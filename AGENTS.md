@@ -46,9 +46,14 @@ Seguir tambem as regras gerais em `../AGENTS.md`.
 
 ## Proximos Passos (Backlog NLP)
 
+Status atual:
+- Correcao pontual de dados ja aplicada no banco: `userCorrectedJson.account/category` convertido de UUID para texto em 54 linhas de feedback.
+- Acuracia de `category` e `account` melhorou, mas ainda ha risco de regressao sem blindagem no codigo.
+
 ### Prioridade Alta
-1. Canonizar labels de `category` e `account` antes do treino.
-- Quando `userCorrectedJson.category/account` vier como UUID, resolver para nome em `bk_tb_categories`/`bk_tb_accounts`.
+1. Blindar canonizacao de labels de `category` e `account` no codigo.
+- Tratar `userCorrectedJson.category/account` como UUID ou texto durante o treino.
+- Resolver UUID para nome em `bk_tb_categories`/`bk_tb_accounts` antes de `addDocument`.
 - Garantir que o classificador textual seja treinado apenas com labels textuais canonicos.
 
 2. Filtrar amostras invalidas no pipeline de treino.
