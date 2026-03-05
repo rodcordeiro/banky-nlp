@@ -43,3 +43,32 @@ Execute dentro de `banky-nlp/`.
 
 ## Referencia Cruzada
 Seguir tambem as regras gerais em `../AGENTS.md`.
+
+## Proximos Passos (Backlog NLP)
+
+### Prioridade Alta
+1. Canonizar labels de `category` e `account` antes do treino.
+- Quando `userCorrectedJson.category/account` vier como UUID, resolver para nome em `bk_tb_categories`/`bk_tb_accounts`.
+- Garantir que o classificador textual seja treinado apenas com labels textuais canonicos.
+
+2. Filtrar amostras invalidas no pipeline de treino.
+- Ignorar exemplos com `label` nulo, vazio ou indefinido.
+- Em fluxos de transferencia, nao treinar `account/category` com exemplos que so possuem `origin/destiny`.
+
+3. Separar treino por contexto de intent.
+- `intent=create`: treinar `account` e `category`.
+- `intent=transfer`: treinar `origin/destiny` (ou classificador dedicado para transferencia).
+
+### Prioridade Media
+4. Endurecer validacao de contrato de feedback.
+- Validar payloads de aprovacao por `status` e `intent`.
+- Exigir campos corrigidos coerentes quando `status=corrected`.
+
+5. Suporte multi-tenant em feedback.
+- Adicionar coluna `owner` em `bk_nlp_feedback`.
+- Salvar `owner` no momento do parse e aplicar filtros por owner no treino e analises.
+
+### Prioridade Baixa
+6. Melhorar normalizacao textual para `category/account`.
+- Normalizar acentos e variantes comuns (`mercadinho/mercadinnho`, `cartao/cartão`).
+- Adicionar regras lexicais para padroes bancarios recorrentes.
