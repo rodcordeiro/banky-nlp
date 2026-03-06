@@ -107,4 +107,3 @@ Status atual:
 1. Melhorar desambiguacao quando ha mais de duas contas na mesma frase.
 
 - Priorizar conta de origem/destino por proximidade dos verbos de transferencia.
-- Adicionar fallback explicito quando houver ambiguidade nao resolvida.
