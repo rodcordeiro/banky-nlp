@@ -68,7 +68,7 @@ export class ValueClassifier extends BaseClassifier {
   }
 
   private collectCandidates(text: string): ValueCandidate[] {
-    const regex = /\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?|\d+/g;
+    const regex = /\b(?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d+)?\b/g;
     const matches = text.matchAll(regex);
     const candidates: ValueCandidate[] = [];
 
@@ -91,7 +91,7 @@ export class ValueClassifier extends BaseClassifier {
 
   private extractFromFinancialVerb(text: string): number | null {
     const match = text.match(
-      /\b(recebi|ganhei|paguei|gastei|transferi|enviei|depositei|coloquei|usei)\s+(?:r\$\s*)?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?|\d+)/i,
+      /\b(recebi|ganhei|paguei|gastei|transferi|enviei|depositei|coloquei|usei)\s+(?:r\$\s*)?((?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d+)?)\b/i,
     );
     if (!match) return null;
 
@@ -102,7 +102,10 @@ export class ValueClassifier extends BaseClassifier {
   private scoreCandidate(candidate: ValueCandidate, text: string): number {
     const lower = text.toLowerCase();
     const start = Math.max(0, candidate.index - 20);
-    const end = Math.min(lower.length, candidate.index + candidate.raw.length + 20);
+    const end = Math.min(
+      lower.length,
+      candidate.index + candidate.raw.length + 20,
+    );
     const window = lower.slice(start, end);
     const after = lower.slice(
       candidate.index + candidate.raw.length,

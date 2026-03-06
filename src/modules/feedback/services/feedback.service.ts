@@ -8,11 +8,16 @@ import { FindManyOptions, FindOptionsWhere, Not, Repository } from 'typeorm';
 import { FeedbackEntity } from '../entities/feedback.entity';
 import { SearchFeedbackDto } from '../dtos/search.dto';
 import { AccountsClassifier } from '@/modules/nlp/classifiers/account.classifier';
-import { IntentClassifier } from '@/modules/nlp/classifiers/intent.classifier';
+import {
+  IntentClassifier,
+  Intents,
+} from '@/modules/nlp/classifiers/intent.classifier';
 import { CategoryClassifier } from '@/modules/nlp/classifiers/category.classifier';
-import { mapFeedback } from '@/common/utils/feedback.util';
 import { PaginationService } from '@/core/paginate/paginate.service';
 import { ValueClassifier } from '@/modules/nlp/classifiers/value.classifier';
+import { AccountsEntity } from '@/modules/nlp/entities/account.entity';
+import { CategoriesEntity } from '@/modules/nlp/entities/category.entity';
+import { TrainingSample } from '@/common/classifiers/base.classifier';
 
 @Injectable()
 export class FeedbackService {
@@ -24,6 +29,10 @@ export class FeedbackService {
   constructor(
     @Inject('FEEDBACK_REPOSITORY')
     private readonly _repository: Repository<FeedbackEntity>,
+    @Inject('ACCOUNT_REPOSITORY')
+    private readonly _accountRepository: Repository<AccountsEntity>,
+    @Inject('CATEGORY_REPOSITORY')
+    private readonly _categoryRepository: Repository<CategoriesEntity>,
     private readonly _paginateService: PaginationService,
   ) {
     this.intentProcessor = new IntentClassifier();
@@ -94,47 +103,145 @@ export class FeedbackService {
       feedbacks.map(i => ({ ...i, usedForTraining: true })),
     );
   }
+
+  private normalizeText(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const normalized = trimmed.toLowerCase();
+    if (normalized === 'undefined' || normalized === 'null') return null;
+    return normalized;
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
+  }
+
+  private async resolveAccountLabel(value: unknown): Promise<string | null> {
+    const normalized = this.normalizeText(value);
+    if (!normalized) return null;
+    if (!this.isUuid(normalized)) return normalized;
+
+    const account = await this._accountRepository.findOne({
+      where: { id: normalized },
+      select: ['id', 'name'],
+    });
+    return this.normalizeText(account?.name);
+  }
+
+  private async resolveCategoryLabel(value: unknown): Promise<string | null> {
+    const normalized = this.normalizeText(value);
+    if (!normalized) return null;
+    if (!this.isUuid(normalized)) return normalized;
+
+    const category = await this._categoryRepository.findOne({
+      where: { id: normalized },
+      select: ['id', 'name'],
+    });
+    return this.normalizeText(category?.name);
+  }
+
+  private selectField(
+    feedback: FeedbackEntity,
+    field: keyof ProcessingResult,
+  ): unknown {
+    const correctedValue = feedback.userCorrectedJson?.[field];
+    if (correctedValue !== undefined && correctedValue !== null)
+      return correctedValue;
+    return feedback.predictedJson?.[field];
+  }
+
+  private async buildIntentSample(
+    feedback: FeedbackEntity,
+  ): Promise<TrainingSample | null> {
+    const label = this.normalizeText(this.selectField(feedback, 'intent'));
+    if (!label) return null;
+    return {
+      text: feedback.originalText.toLowerCase(),
+      label,
+    };
+  }
+
+  private async buildCategorySample(
+    feedback: FeedbackEntity,
+  ): Promise<TrainingSample | null> {
+    const label = await this.resolveCategoryLabel(
+      this.selectField(feedback, 'category'),
+    );
+    if (!label) return null;
+    return {
+      text: feedback.originalText.toLowerCase(),
+      label,
+    };
+  }
+
+  private async buildAccountSample(
+    feedback: FeedbackEntity,
+    field: 'account' | 'origin' | 'destiny',
+  ): Promise<TrainingSample | null> {
+    const label = await this.resolveAccountLabel(this.selectField(feedback, field));
+    if (!label) return null;
+    return {
+      text: feedback.originalText.toLowerCase(),
+      label,
+    };
+  }
+
+  private buildValueSample(feedback: FeedbackEntity): TrainingSample | null {
+    const value = feedback.userCorrectedJson?.value ?? feedback.predictedJson?.value;
+    if (typeof value !== 'number' || Number.isNaN(value)) return null;
+    return {
+      text: feedback.originalText,
+      label: value.toString(),
+    };
+  }
+
   async trainClassifiers(fullTraining?: boolean) {
-    const { feeds, intents, categories, accounts, origin, destiny, values } =
-      await this.getUntrainedFeedback(fullTraining).then(feeds => {
-        // console.debug({ feeds });
-        const intents = feeds.map(i => mapFeedback(i, 'intent'));
-        const categories = feeds.map(i => mapFeedback(i, 'category'));
-        const accounts = feeds.map(i => mapFeedback(i, 'account'));
-        const origin = feeds.map(i => mapFeedback(i, 'origin'));
-        const destiny = feeds.map(i => mapFeedback(i, 'destiny'));
-        const values = feeds.map(i => ({
-          text: i.originalText,
-          label: (
-            i.userCorrectedJson?.value ??
-            i.predictedJson?.value ??
-            0
-          )?.toString(),
-        }));
-        return {
-          feeds,
-          intents,
-          categories,
-          accounts,
-          origin,
-          destiny,
-          values,
-        };
-      });
+    const feeds = await this.getUntrainedFeedback(fullTraining);
 
     if (!feeds.length) return;
 
-    await this.intentProcessor.train(intents);
+    const intents: TrainingSample[] = [];
+    const categories: TrainingSample[] = [];
+    const accounts: TrainingSample[] = [];
+    const origin: TrainingSample[] = [];
+    const destiny: TrainingSample[] = [];
+    const values: TrainingSample[] = [];
 
-    await this.accountProcessor.train(accounts);
+    for (const feed of feeds) {
+      const intentSample = await this.buildIntentSample(feed);
+      if (!intentSample) continue;
 
-    if (origin.length) {
-      await this.accountProcessor.train(origin);
-      await this.accountProcessor.train(destiny);
+      intents.push(intentSample);
+
+      if (intentSample.label === Intents.CREATE) {
+        const accountSample = await this.buildAccountSample(feed, 'account');
+        if (accountSample) accounts.push(accountSample);
+
+        const categorySample = await this.buildCategorySample(feed);
+        if (categorySample) categories.push(categorySample);
+      }
+
+      if (intentSample.label === Intents.TRANSFER) {
+        const originSample = await this.buildAccountSample(feed, 'origin');
+        if (originSample) origin.push(originSample);
+
+        const destinySample = await this.buildAccountSample(feed, 'destiny');
+        if (destinySample) destiny.push(destinySample);
+      }
+
+      const valueSample = this.buildValueSample(feed);
+      if (valueSample) values.push(valueSample);
     }
 
-    await this.categoriesProcessor.train(categories);
-    await this.valuesProcessor.train(values);
+    if (intents.length) await this.intentProcessor.train(intents);
+    if (accounts.length) await this.accountProcessor.train(accounts);
+    if (origin.length) await this.accountProcessor.train(origin);
+    if (destiny.length) await this.accountProcessor.train(destiny);
+    if (categories.length) await this.categoriesProcessor.train(categories);
+    if (values.length) await this.valuesProcessor.train(values);
 
     await this.markAsTrained(feeds);
   }
