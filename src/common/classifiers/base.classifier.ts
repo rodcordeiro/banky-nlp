@@ -25,7 +25,6 @@ export class BaseClassifier {
     const modelPath = this.getModelPath();
 
     if (fs.existsSync(modelPath)) {
-      // Carrega o modelo já treinado
       return new Promise((resolve, reject) => {
         BayesClassifier.load(modelPath, PorterStemmerPt, (err, classifier) => {
           if (err) return reject(err);
@@ -34,19 +33,33 @@ export class BaseClassifier {
         });
       });
     } else {
-      // Cria um novo se não existir
       this.classifier = new BayesClassifier(PorterStemmerPt);
       return this.classifier;
     }
   }
 
   preprocess(text: string): string {
-    // return this._tokenizer.tokenize(text.toLowerCase()).join(' ');
-    return text
+    const normalized = text
       .toLowerCase()
-      .replace(/[^\w\s\*\.]/g, '') // mantém ** e .
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s*.]/g, ' ');
+
+    return this.normalizeLexicalVariants(normalized)
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  private normalizeLexicalVariants(text: string): string {
+    return text
+      .replace(/\bmercadinnho\b/g, 'mercadinho')
+      .replace(/\bmercadinnh[oa]\b/g, 'mercadinho')
+      .replace(/\bmercadinhoo\b/g, 'mercadinho')
+      .replace(/\btaxa bancaria\b/g, 'taxa de servico')
+      .replace(/\bbu\b/g, 'bilhete unico')
+      .replace(/\bsmart break\b/g, 'smartbreak')
+      .replace(/\bpra\b/g, 'para')
+      .replace(/\bpro\b/g, 'para');
   }
 
   async classify(text: string): Promise<string | number | null> {
@@ -66,11 +79,8 @@ export class BaseClassifier {
     await this.save();
   }
 
-  /**
-   * Re-treina incrementalmente com novos exemplos (ex: feedback)
-   */
   async retrain(newSamples: TrainingSample[]): Promise<void> {
-    console.log(`🔁 Re-treinando modelo '${this.model}' com feedback...`);
+    console.log(`Retraining model '${this.model}' with feedback...`);
     const classifier = await this.init();
 
     for (const sample of newSamples) {
@@ -79,7 +89,7 @@ export class BaseClassifier {
 
     classifier.train();
     await this.save();
-    console.log(`✅ Re-treinamento concluído: ${this.model}`);
+    console.log(`Retraining finished: ${this.model}`);
   }
 
   private save(): Promise<void> {
@@ -87,7 +97,7 @@ export class BaseClassifier {
     return new Promise((resolve, reject) => {
       this.classifier!.save(modelPath, err => {
         if (err) reject(err);
-        console.log(`✅ Modelo '${this.model}' salvo em ${modelPath}`);
+        console.log(`Model '${this.model}' saved in ${modelPath}`);
         resolve();
       });
     });

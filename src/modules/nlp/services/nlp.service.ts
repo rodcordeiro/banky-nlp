@@ -35,34 +35,50 @@ export class NlpService {
     return (await this._accountsRepository.find()).map(i => i.name);
   }
 
+  private cleanAccountChunk(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    return value
+      .trim()
+      .replace(/^(o|a|os|as)\s+/i, '')
+      .replace(/\s+/g, ' ');
+  }
+
+  private extractTransferOrigin(cleaned: string): string | undefined {
+    const paired = cleaned.match(
+      /\b(?:do|de|na conta)\s+(.+?)\s+(?:para|pra|pro)\s+/i,
+    );
+    if (paired?.[1]) return this.cleanAccountChunk(paired[1]);
+
+    const byDoDe = cleaned.match(/\b(?:do|de)\s+(.+?)(?:,|$)/i);
+    if (byDoDe?.[1]) return this.cleanAccountChunk(byDoDe[1]);
+
+    const byConta = cleaned.match(/\bna conta\s+(.+?)(?:,|$)/i);
+    if (byConta?.[1]) return this.cleanAccountChunk(byConta[1]);
+
+    return undefined;
+  }
+
+  private extractTransferDestiny(cleaned: string): string | undefined {
+    const match = cleaned.match(
+      /\b(?:para|pra|pro)\s+(.+?)(?:(?:\s+dia\b)|(?:\s+\d{1,2}[/-]\d{1,2})|,|$)/i,
+    );
+    if (!match?.[1]) return undefined;
+    return this.cleanAccountChunk(match[1]);
+  }
+
   async extractEntities(text: string) {
     const result: ProcessingResult = {};
     const cleaned = text.toLowerCase();
 
     result.intent = await this.intentProcessor.classify(cleaned);
     if (result.intent === 'transfer') {
-      // 1. Encontrar ORIGEM por estrutura da frase
-      let originText: string | undefined;
-
-      const originRegex = /na conta ([^,]+)|do ([^ ]+)/i;
-      const oMatch = originRegex.exec(cleaned);
-      if (oMatch) {
-        originText = (oMatch[1] || oMatch[2])?.trim();
-      }
+      const originText = this.extractTransferOrigin(cleaned);
+      const destText = this.extractTransferDestiny(cleaned);
 
       if (originText) {
         result.origin = (await this.accountProcessor.classify(
           originText,
         )) as string;
-      }
-
-      // 2. Encontrar DESTINO por estrutura da frase
-      let destText: string | undefined;
-
-      const destRegex = /para ([^,]+)/i;
-      const dMatch = destRegex.exec(cleaned);
-      if (dMatch) {
-        destText = dMatch[1].trim();
       }
 
       if (destText) {
@@ -71,7 +87,6 @@ export class NlpService {
         )) as string;
       }
 
-      // fallback — se ainda assim algo falhar
       if (!result.origin) {
         result.origin = (await this.accountProcessor.classify(text)) as string;
       }
@@ -83,30 +98,14 @@ export class NlpService {
       }
     } else {
       result.account = (await this.accountProcessor.classify(text)) as string;
-      // if (result.account)
-      //   result.accountId = (
-      //     await this._accountsRepository.findOne({
-      //       where: { name: result.account },
-      //     })
-      //   )?.id;
 
       result.category = (await this.categoriesProcessor.classify(
         text,
       )) as string;
-      // if (result.category)
-      //   result.categoryId = (
-      //     await this._categoriesRepository.findOne({
-      //       where: { name: result.category },
-      //     })
-      //   )?.id;
     }
 
     result.value = (await this.valueProcessor.classify(text)) as number;
-    // valor
-    // const valMatch = text.match(/(\d+[,.]?\d*)\s*(reais|rs|r\$)?/i);
-    // if (valMatch) result.value = valMatch;
 
-    // data
     const dateParsed = pt.parseDate(text);
     if (dateParsed) {
       result.date = dateParsed.toISOString();

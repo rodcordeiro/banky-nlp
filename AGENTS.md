@@ -61,6 +61,7 @@ Status atual:
 - Contrato de aprovacao por `status/intent` endurecido para `status=corrected`.
 - Suporte multi-tenant em feedback aplicado com coluna `owner`, persistencia no parse e filtros no treino/listagem.
 - Suíte de regressao dos 4 classifiers expandida para 40 casos por classe (baseada em feedbacks corrigidos).
+- Normalizacao textual base melhorada (acentos/variantes lexicais) e heuristicas de transferencia refinadas para `para/pra/pro`.
 
 ### Prioridade Alta
 
@@ -98,12 +99,12 @@ Status atual:
 
 ### Prioridade Baixa
 
-1. Melhorar normalizacao textual para `category/account`.
+1. Cobrir novas normalizacoes com mais cenarios de regressao.
 
-- Normalizar acentos e variantes comuns (`mercadinho/mercadinnho`, `cartao/cartão`).
-- Adicionar regras lexicais para padroes bancarios recorrentes.
+- Adicionar casos para variacoes ortograficas adicionais e abreviacoes bancarias.
+- Medir impacto das substituicoes lexicais em classificacoes antigas.
 
-1. Melhorar heuristicas de entidades para transferencia.
+1. Melhorar desambiguacao quando ha mais de duas contas na mesma frase.
 
-- Refinar regex de origem/destino para frases com preposicoes variadas (`pro`, `pra`, `de`).
-- Reduzir ambiguidades quando houver mais de duas contas citadas no mesmo texto.
+- Priorizar conta de origem/destino por proximidade dos verbos de transferencia.
+- Adicionar fallback explicito quando houver ambiguidade nao resolvida.
