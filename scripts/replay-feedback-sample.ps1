@@ -1,9 +1,12 @@
-﻿param(
-  [int]$Days = 30
+param(
+  [int]$Days = 30,
+  [string]$Owner = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $baseUrl = 'http://localhost:3334/api/v1'
+$normalizedOwner = $Owner.Trim().ToLowerInvariant()
+$ownerLabel = if ($normalizedOwner) { $normalizedOwner } else { 'global' }
 $reportPath = "reports/nlp-feedback-replay-$Days-days-2026-03-06.md"
 
 function Normalize-Text([object]$value) {
@@ -16,7 +19,7 @@ function Normalize-Text([object]$value) {
       [void]$chars.Add($c)
     }
   }
-  -join $chars
+  return (-join $chars)
 }
 
 function Get-Day([object]$value) {
@@ -37,10 +40,10 @@ function Compare-Field([string]$field, [object]$pred, [object]$target) {
 
   if ($field -eq 'date') {
     if ($null -eq $target) { return $true }
-    $a = Get-Day $pred
-    $b = Get-Day $target
-    if ($null -eq $a -or $null -eq $b) { return $false }
-    return $a -eq $b
+    $predDay = Get-Day $pred
+    $targetDay = Get-Day $target
+    if ($null -eq $predDay -or $null -eq $targetDay) { return $false }
+    return $predDay -eq $targetDay
   }
 
   if ($null -eq $target) { return $true }
@@ -48,61 +51,37 @@ function Compare-Field([string]$field, [object]$pred, [object]$target) {
 }
 
 function Test-Match($pred, $target) {
-  $intentTarget = Normalize-Text $target.intent
-  $intentPred = Normalize-Text $pred.intent
-  if ($intentTarget -ne $intentPred) { return $false }
+  $targetIntent = Normalize-Text $target.intent
+  $predIntent = Normalize-Text $pred.intent
+  if ($targetIntent -ne $predIntent) { return $false }
 
-  $fields = if ($intentTarget -eq 'transfer') {
+  $fields = if ($targetIntent -eq 'transfer') {
     @('origin', 'destiny', 'value', 'date')
   } else {
     @('account', 'category', 'value', 'date')
   }
 
   foreach ($field in $fields) {
-    $ok = Compare-Field $field $pred.$field $target.$field
-    if (-not $ok) { return $false }
+    if (-not (Compare-Field $field $pred.$field $target.$field)) {
+      return $false
+    }
   }
+
   return $true
 }
 
 function Invoke-JsonPost([string]$uri, $payload) {
   $json = $payload | ConvertTo-Json -Depth 20 -Compress
-  Invoke-RestMethod -Method Post -Uri $uri -ContentType 'application/json; charset=utf-8' -Body $json
+  return Invoke-RestMethod -Method Post -Uri $uri -ContentType 'application/json; charset=utf-8' -Body $json
 }
 
-$all = @()
-$page = 1
-$limit = 100
-while ($true) {
-  $resp = Invoke-RestMethod -Method Get -Uri "$baseUrl/feedback?limit=$limit&page=$page"
-  $all += $resp.items
-  if (-not $resp.meta.hasNext) { break }
-  $page += 1
-}
+function Invoke-Replay([psobject]$feedback, [psobject]$target) {
+  $parsed = Invoke-JsonPost "$baseUrl/nlp" @{
+    text = $feedback.originalText
+    owner = $feedback.owner
+  }
 
-$cutoff = (Get-Date).AddDays(-$Days)
-$recent = $all |
-  Where-Object { ([datetime]$_.createdAt) -ge $cutoff } |
-  Sort-Object createdAt -Descending
-
-$totalRecent = $recent.Count
-$sampleSize = [Math]::Ceiling($totalRecent * 0.2)
-$sample = @($recent | Select-Object -First $sampleSize)
-
-$rows = New-Object System.Collections.Generic.List[object]
-$beforeHits = 0
-$afterHits = 0
-$validatedCount = 0
-$correctedCount = 0
-
-foreach ($fb in $sample) {
-  $target = if ($null -ne $fb.userCorrectedJson) { $fb.userCorrectedJson } else { $fb.predictedJson }
-
-  $beforeOk = Test-Match $fb.predictedJson $target
-  if ($beforeOk) { $beforeHits += 1 }
-
-  $parsed = Invoke-JsonPost "$baseUrl/nlp" @{ text = $fb.originalText; owner = $fb.owner }
-  $newPred = [pscustomobject]@{
+  $prediction = [pscustomobject]@{
     intent = $parsed.intent
     account = $parsed.account
     category = $parsed.category
@@ -112,30 +91,118 @@ foreach ($fb in $sample) {
     destiny = $parsed.destiny
   }
 
-  $afterOk = Test-Match $newPred $target
-  if ($afterOk) {
-    $afterHits += 1
-    Invoke-JsonPost "$baseUrl/feedback/$($parsed.feedback)" @{ status = 'validated' } | Out-Null
-    $validatedCount += 1
+  $matches = Test-Match $prediction $target
+  $status = if ($matches) { 'validated' } else { 'corrected' }
+  $payload = if ($matches) {
+    @{ status = 'validated' }
   } else {
-    Invoke-JsonPost "$baseUrl/feedback/$($parsed.feedback)" @{ status = 'corrected'; userCorrectedJson = $target } | Out-Null
-    $correctedCount += 1
+    @{ status = 'corrected'; userCorrectedJson = $target }
+  }
+
+  Invoke-JsonPost "$baseUrl/feedback/$($parsed.feedback)" $payload | Out-Null
+
+  return [pscustomobject]@{
+    feedbackId = $parsed.feedback
+    prediction = $prediction
+    matches = $matches
+    statusApplied = $status
+  }
+}
+
+function Build-TrainingQuery([string]$owner) {
+  $query = '?fullTraining=false'
+  if ($owner) {
+    $query += '&owner=' + [System.Uri]::EscapeDataString($owner)
+  }
+  return $query
+}
+
+$all = @()
+$page = 1
+$limit = 100
+while ($true) {
+  $response = Invoke-RestMethod -Method Get -Uri "$baseUrl/feedback?limit=$limit&page=$page"
+  $all += $response.items
+  if (-not $response.meta.hasNext) { break }
+  $page += 1
+}
+
+$cutoff = (Get-Date).AddDays(-$Days)
+$recentCandidates = @(
+  $all |
+    Where-Object {
+      ([datetime]$_.createdAt) -ge $cutoff -and
+      (Normalize-Text $_.owner) -eq $ownerLabel
+    } |
+    Sort-Object createdAt -Descending
+)
+
+$totalRecent = $recentCandidates.Count
+$sampleTargetSize = [Math]::Ceiling($totalRecent * 0.2)
+$sample = @($recentCandidates | Select-Object -First $sampleTargetSize)
+$sampleSize = $sample.Count
+
+$rows = New-Object System.Collections.Generic.List[object]
+$beforeHits = 0
+$afterHits = 0
+$validatedBefore = 0
+$correctedBefore = 0
+$validatedAfter = 0
+$correctedAfter = 0
+
+foreach ($feedback in $sample) {
+  $target = if ($null -ne $feedback.userCorrectedJson) {
+    $feedback.userCorrectedJson
+  } else {
+    $feedback.predictedJson
+  }
+
+  $beforeReplay = Invoke-Replay $feedback $target
+  if ($beforeReplay.matches) {
+    $beforeHits += 1
+    $validatedBefore += 1
+  } else {
+    $correctedBefore += 1
   }
 
   $rows.Add([pscustomobject]@{
-    id = $fb.id
-    replayFeedbackId = $parsed.feedback
-    text = $fb.originalText
-    expectedIntent = $target.intent
-    beforeOk = $beforeOk
-    afterOk = $afterOk
-    statusApplied = if ($afterOk) { 'validated' } else { 'corrected' }
+    sourceFeedbackId = $feedback.id
+    sourceText = $feedback.originalText
+    beforeReplayFeedbackId = $beforeReplay.feedbackId
+    beforeOk = $beforeReplay.matches
+    beforeStatus = $beforeReplay.statusApplied
+    afterReplayFeedbackId = ''
+    afterOk = $false
+    afterStatus = ''
   }) | Out-Null
 }
 
-$beforeRate = if ($sampleSize -eq 0) { 0 } else { [math]::Round(($beforeHits / $sampleSize) * 100, 2) }
-$afterRate = if ($sampleSize -eq 0) { 0 } else { [math]::Round(($afterHits / $sampleSize) * 100, 2) }
-$delta = [math]::Round(($afterRate - $beforeRate), 2)
+Invoke-RestMethod -Method Post -Uri ($baseUrl + '/feedback/training' + (Build-TrainingQuery $normalizedOwner)) | Out-Null
+
+for ($index = 0; $index -lt $sample.Count; $index += 1) {
+  $feedback = $sample[$index]
+  $target = if ($null -ne $feedback.userCorrectedJson) {
+    $feedback.userCorrectedJson
+  } else {
+    $feedback.predictedJson
+  }
+
+  $afterReplay = Invoke-Replay $feedback $target
+  if ($afterReplay.matches) {
+    $afterHits += 1
+    $validatedAfter += 1
+  } else {
+    $correctedAfter += 1
+  }
+
+  $rows[$index].afterReplayFeedbackId = $afterReplay.feedbackId
+  $rows[$index].afterOk = $afterReplay.matches
+  $rows[$index].afterStatus = $afterReplay.statusApplied
+}
+
+$beforeRate = if ($sampleSize -eq 0) { 0 } else { [Math]::Round(($beforeHits / $sampleSize) * 100, 2) }
+$afterRate = if ($sampleSize -eq 0) { 0 } else { [Math]::Round(($afterHits / $sampleSize) * 100, 2) }
+$delta = [Math]::Round(($afterRate - $beforeRate), 2)
 
 New-Item -ItemType Directory -Path (Split-Path $reportPath) -Force | Out-Null
 
@@ -144,34 +211,36 @@ $lines += "# Relatorio de Replay de Feedbacks ($Days dias)"
 $lines += ''
 $lines += "- Data de execucao: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz')"
 $lines += "- Janela analisada: ultimos $Days dias"
+$lines += "- Owner avaliado: $ownerLabel"
 $lines += "- Total de feedbacks na janela: $totalRecent"
-$lines += "- Amostra replay (20%): $sampleSize feedbacks"
-$lines += "- Criterio da amostra: 20% mais recentes"
+$lines += "- Amostra fixa replay (20%): $sampleSize feedbacks"
+$lines += "- Criterio da amostra: 20% mais recentes, congelados antes do treino"
 $lines += ''
 $lines += '## Acuracidade'
 $lines += ''
-$lines += "- Taxa anterior (predicted vs alvo corrigido): $beforeRate% ($beforeHits/$sampleSize)"
-$lines += "- Taxa apos replay: $afterRate% ($afterHits/$sampleSize)"
+$lines += "- Taxa antes do treino: $beforeRate% ($beforeHits/$sampleSize)"
+$lines += "- Taxa depois do treino: $afterRate% ($afterHits/$sampleSize)"
 $lines += "- Delta: $delta p.p."
 $lines += ''
-$lines += '## Acoes aplicadas nos feedbacks reprocessados'
+$lines += '## Acoes aplicadas'
 $lines += ''
-$lines += "- Validados: $validatedCount"
-$lines += "- Corrigidos: $correctedCount"
+$lines += "- Antes do treino: $validatedBefore validados, $correctedBefore corrigidos"
+$lines += "- Depois do treino: $validatedAfter validados, $correctedAfter corrigidos"
 $lines += ''
 $lines += '## Detalhes da amostra'
 $lines += ''
-$lines += '| feedback_original | feedback_replay | before | after | status_aplicado | texto |'
+$lines += '| feedback_origem | replay_antes | ok_antes | replay_depois | ok_depois | texto |'
 $lines += '|---|---|---|---|---|---|'
-foreach ($r in $rows) {
-  $txt = ($r.text -replace '\|','/')
-  $lines += "| $($r.id) | $($r.replayFeedbackId) | $($r.beforeOk) | $($r.afterOk) | $($r.statusApplied) | $txt |"
+foreach ($row in $rows) {
+  $text = ($row.sourceText -replace '\|', '/')
+  $lines += "| $($row.sourceFeedbackId) | $($row.beforeReplayFeedbackId) | $($row.beforeOk) | $($row.afterReplayFeedbackId) | $($row.afterOk) | $text |"
 }
 
 Set-Content -Path $reportPath -Value ($lines -join "`n") -Encoding UTF8
 
-$result = [pscustomobject]@{
+[pscustomobject]@{
   days = $Days
+  owner = $ownerLabel
   totalRecent = $totalRecent
   sampleSize = $sampleSize
   beforeHits = $beforeHits
@@ -179,9 +248,9 @@ $result = [pscustomobject]@{
   beforeRate = $beforeRate
   afterRate = $afterRate
   delta = $delta
-  validated = $validatedCount
-  corrected = $correctedCount
+  validatedBefore = $validatedBefore
+  correctedBefore = $correctedBefore
+  validatedAfter = $validatedAfter
+  correctedAfter = $correctedAfter
   reportPath = (Resolve-Path $reportPath).Path
-}
-
-$result | ConvertTo-Json -Depth 5
+} | ConvertTo-Json -Depth 5
