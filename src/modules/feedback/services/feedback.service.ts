@@ -19,6 +19,10 @@ import { AccountsEntity } from '@/modules/nlp/entities/account.entity';
 import { CategoriesEntity } from '@/modules/nlp/entities/category.entity';
 import { TrainingSample } from '@/common/classifiers/base.classifier';
 
+interface IntentTrainingSample extends TrainingSample {
+  label: Intents;
+}
+
 @Injectable()
 export class FeedbackService {
   private intentProcessor: IntentClassifier;
@@ -68,6 +72,8 @@ export class FeedbackService {
         throw new NotFoundException('Feedback nao encontrado para aprovacao.');
       }
 
+      this.validateApprovalPayload(existing, payload);
+
       const feedback = this._repository.create({
         ...existing,
         ...payload,
@@ -81,12 +87,17 @@ export class FeedbackService {
       );
     }
 
+    payload.owner = this.normalizeOwner(payload.owner);
     const feedback = this._repository.create(payload);
     return await this._repository.save(feedback);
   }
 
-  async getUntrainedFeedback(all: boolean = false) {
-    const filter = {};
+  async getUntrainedFeedback(all: boolean = false, owner?: string) {
+    const filter: FindOptionsWhere<FeedbackEntity> = {};
+    const normalizedOwner = this.normalizeOwner(owner);
+    if (normalizedOwner) {
+      filter.owner = normalizedOwner;
+    }
 
     if (!all) {
       filter['status'] = Not('pending');
@@ -111,6 +122,97 @@ export class FeedbackService {
     const normalized = trimmed.toLowerCase();
     if (normalized === 'undefined' || normalized === 'null') return null;
     return normalized;
+  }
+
+  private normalizeOwner(value: unknown): string {
+    if (typeof value !== 'string') return 'global';
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : 'global';
+  }
+
+  private isValidStatus(status: unknown): status is FeedbackEntity['status'] {
+    return (
+      status === 'pending' || status === 'validated' || status === 'corrected'
+    );
+  }
+
+  private ensureNumericValue(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    throw new BadRequestException('userCorrectedJson.value deve ser numerico.');
+  }
+
+  private requireTextField(value: unknown, fieldName: string): string {
+    const normalized = this.normalizeText(value);
+    if (!normalized) {
+      throw new BadRequestException(
+        `userCorrectedJson.${fieldName} e obrigatorio.`,
+      );
+    }
+    return normalized;
+  }
+
+  private validateCorrectedPayloadIntent(
+    corrected: ProcessingResult,
+    fallbackIntent?: string,
+  ): Intents {
+    const rawIntent =
+      this.normalizeText(corrected.intent) ??
+      this.normalizeText(fallbackIntent);
+    if (rawIntent !== Intents.CREATE && rawIntent !== Intents.TRANSFER) {
+      throw new BadRequestException(
+        'userCorrectedJson.intent deve ser create ou transfer.',
+      );
+    }
+    return rawIntent;
+  }
+
+  private validateCorrectedFields(
+    corrected: ProcessingResult,
+    intent: Intents,
+  ) {
+    this.ensureNumericValue(corrected.value);
+
+    if (intent === Intents.CREATE) {
+      this.requireTextField(corrected.account, 'account');
+      this.requireTextField(corrected.category, 'category');
+      return;
+    }
+
+    this.requireTextField(corrected.origin, 'origin');
+    this.requireTextField(corrected.destiny, 'destiny');
+  }
+
+  private validateApprovalPayload(
+    existing: FeedbackEntity,
+    payload: Partial<FeedbackEntity>,
+  ) {
+    const nextStatus = payload.status ?? existing.status;
+    if (!this.isValidStatus(nextStatus)) {
+      throw new BadRequestException(
+        'status invalido para aprovacao de feedback.',
+      );
+    }
+
+    if (nextStatus !== 'corrected' && payload.userCorrectedJson) {
+      throw new BadRequestException(
+        'userCorrectedJson so pode ser enviado quando status=corrected.',
+      );
+    }
+
+    if (nextStatus !== 'corrected') return;
+
+    const corrected = payload.userCorrectedJson;
+    if (!corrected) {
+      throw new BadRequestException(
+        'userCorrectedJson e obrigatorio quando status=corrected.',
+      );
+    }
+
+    const intent = this.validateCorrectedPayloadIntent(
+      corrected,
+      existing.predictedJson?.intent,
+    );
+    this.validateCorrectedFields(corrected, intent);
   }
 
   private isUuid(value: string): boolean {
@@ -153,11 +255,11 @@ export class FeedbackService {
     return feedback.predictedJson?.[field];
   }
 
-  private async buildIntentSample(
+  private buildIntentSample(
     feedback: FeedbackEntity,
-  ): Promise<TrainingSample | null> {
+  ): IntentTrainingSample | null {
     const label = this.normalizeText(this.selectField(feedback, 'intent'));
-    if (!label) return null;
+    if (label !== Intents.CREATE && label !== Intents.TRANSFER) return null;
     return {
       text: feedback.originalText.toLowerCase(),
       label,
@@ -181,7 +283,9 @@ export class FeedbackService {
     feedback: FeedbackEntity,
     field: 'account' | 'origin' | 'destiny',
   ): Promise<TrainingSample | null> {
-    const label = await this.resolveAccountLabel(this.selectField(feedback, field));
+    const label = await this.resolveAccountLabel(
+      this.selectField(feedback, field),
+    );
     if (!label) return null;
     return {
       text: feedback.originalText.toLowerCase(),
@@ -190,7 +294,8 @@ export class FeedbackService {
   }
 
   private buildValueSample(feedback: FeedbackEntity): TrainingSample | null {
-    const value = feedback.userCorrectedJson?.value ?? feedback.predictedJson?.value;
+    const value =
+      feedback.userCorrectedJson?.value ?? feedback.predictedJson?.value;
     if (typeof value !== 'number' || Number.isNaN(value)) return null;
     return {
       text: feedback.originalText,
@@ -198,12 +303,12 @@ export class FeedbackService {
     };
   }
 
-  async trainClassifiers(fullTraining?: boolean) {
-    const feeds = await this.getUntrainedFeedback(fullTraining);
+  async trainClassifiers(fullTraining?: boolean, owner?: string) {
+    const feeds = await this.getUntrainedFeedback(fullTraining, owner);
 
     if (!feeds.length) return;
 
-    const intents: TrainingSample[] = [];
+    const intents: IntentTrainingSample[] = [];
     const categories: TrainingSample[] = [];
     const accounts: TrainingSample[] = [];
     const origin: TrainingSample[] = [];
@@ -211,7 +316,7 @@ export class FeedbackService {
     const values: TrainingSample[] = [];
 
     for (const feed of feeds) {
-      const intentSample = await this.buildIntentSample(feed);
+      const intentSample = this.buildIntentSample(feed);
       if (!intentSample) continue;
 
       intents.push(intentSample);

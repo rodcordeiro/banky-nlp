@@ -3,6 +3,9 @@ import { Entity, Column } from 'typeorm';
 
 @Entity({ name: 'bk_nlp_feedback' })
 export class FeedbackEntity extends BaseEntity {
+  @Column({ type: 'varchar', length: 64, default: 'global' })
+  owner: string;
+
   @Column('text')
   originalText: string;
 

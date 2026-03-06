@@ -117,9 +117,10 @@ export class NlpService {
     return result;
   }
 
-  async parse(text: string) {
+  async parse(text: string, owner?: string) {
     const parsed = await this.extractEntities(text);
     const feedback = await this._feedbackService.save({
+      owner: owner?.trim() || 'global',
       originalText: text,
       predictedJson: parsed,
     });

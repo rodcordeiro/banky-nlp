@@ -4,6 +4,7 @@ import { FeedbackService } from '../services/feedback.service';
 import { SearchFeedbackDto } from '../dtos/search.dto';
 import { ApproveFeedbackDto } from '../dtos/Approve.dto';
 import { FeedbackEntity } from '../entities/feedback.entity';
+import { TrainFeedbackDto } from '../dtos/training.dto';
 
 @ApiTags('feedback')
 @Controller({
@@ -26,7 +27,10 @@ export class FeedbackController {
     } as unknown as Partial<FeedbackEntity>);
   }
   @Post('/training')
-  async train() {
-    return await this._service.trainClassifiers();
+  async train(@Query() query: TrainFeedbackDto) {
+    return await this._service.trainClassifiers(
+      query.fullTraining,
+      query.owner,
+    );
   }
 }

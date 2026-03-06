@@ -5,7 +5,7 @@ export class SearchFeedbackDto {
   @ApiPropertyOptional({
     type: 'string',
   })
-  status?: keyof FeedbackEntity['status'];
+  status?: FeedbackEntity['status'];
   @ApiPropertyOptional({
     type: 'boolean',
   })
@@ -14,6 +14,10 @@ export class SearchFeedbackDto {
     type: 'string',
   })
   id?: string;
+  @ApiPropertyOptional({
+    type: 'string',
+  })
+  owner?: string;
   /**
    *Limite data of the paginate transactions.
    *@example 100

@@ -57,37 +57,44 @@ Seguir tambem as regras gerais em `../AGENTS.md`.
 Status atual:
 
 - Correcao pontual de dados ja aplicada no banco: `userCorrectedJson.account/category` convertido de UUID para texto em 54 linhas de feedback.
-- Acuracia de `category` e `account` melhorou, mas ainda ha risco de regressao sem blindagem no codigo.
+- Blindagem de treino por `intent` aplicada (create vs transfer), com filtro de amostras invalidas.
+- Contrato de aprovacao por `status/intent` endurecido para `status=corrected`.
+- Suporte multi-tenant em feedback aplicado com coluna `owner`, persistencia no parse e filtros no treino/listagem.
+- Suíte de regressao dos 4 classifiers expandida para 40 casos por classe (baseada em feedbacks corrigidos).
 
 ### Prioridade Alta
 
-1. Blindar canonizacao de labels de `category` e `account` no codigo.
+1. Fechar isolamento de tenant ponta a ponta (sem fallback silencioso).
 
-- Tratar `userCorrectedJson.category/account` como UUID ou texto durante o treino.
-- Resolver UUID para nome em `bk_tb_categories`/`bk_tb_accounts` antes de `addDocument`.
-- Garantir que o classificador textual seja treinado apenas com labels textuais canonicos.
+- Trocar fallback `owner='global'` por owner obrigatorio vindo de contexto autenticado.
+- Bloquear treino/listagem sem owner quando a operacao for tenant-scoped.
 
-1. Filtrar amostras invalidas no pipeline de treino.
+1. Ajustar o treinamento agendado para multi-tenant.
 
-- Ignorar exemplos com `label` nulo, vazio ou indefinido.
-- Em fluxos de transferencia, nao treinar `account/category` com exemplos que so possuem `origin/destiny`.
+- Rodar `retrain` por owner (iterando tenants ativos), evitando misturar sinais entre usuarios.
+- Evitar que cron noturno re-treine feedback de todos os owners em uma passada unica.
 
-1. Separar treino por contexto de intent.
+1. Cobrir fluxo completo de parse+approve+train com testes e2e.
 
-- `intent=create`: treinar `account` e `category`.
-- `intent=transfer`: treinar `origin/destiny` (ou classificador dedicado para transferencia).
+- Validar cenarios `create` e `transfer` por owner.
+- Garantir que payload invalido de aprovacao retorne erro consistente de contrato.
 
 ### Prioridade Media
 
-1. Endurecer validacao de contrato de feedback.
+1. Endurecer validacao de entrada via DTO/schema.
 
-- Validar payloads de aprovacao por `status` e `intent`.
-- Exigir campos corrigidos coerentes quando `status=corrected`.
+- Mover validacoes de contrato de feedback para schema (Zod/class-validator) alem da regra de servico.
+- Padronizar mensagens/codigos de erro para clientes.
 
-1. Suporte multi-tenant em feedback.
+1. Evoluir modelo de owner no banco.
 
-- Adicionar coluna `owner` em `bk_nlp_feedback`.
-- Salvar `owner` no momento do parse e aplicar filtros por owner no treino e analises.
+- Backfill de dados legados que ainda estejam com owner nulo/`global`.
+- Adicionar indice em `bk_nlp_feedback(owner, status, usedForTraining)` para melhorar treino/listagem.
+
+1. Propagar `owner` para analiticos externos.
+
+- Garantir que consumidores de analise usem filtro por owner como padrao.
+- Definir modo explicito para agregacao cross-tenant apenas quando solicitado.
 
 ### Prioridade Baixa
 
@@ -95,3 +102,8 @@ Status atual:
 
 - Normalizar acentos e variantes comuns (`mercadinho/mercadinnho`, `cartao/cartão`).
 - Adicionar regras lexicais para padroes bancarios recorrentes.
+
+1. Melhorar heuristicas de entidades para transferencia.
+
+- Refinar regex de origem/destino para frases com preposicoes variadas (`pro`, `pra`, `de`).
+- Reduzir ambiguidades quando houver mais de duas contas citadas no mesmo texto.

@@ -11,7 +11,7 @@ export class UserCorrectedJsonDto {
 
 export class ApproveFeedbackDto {
   @ApiProperty({ type: 'string' })
-  status: keyof FeedbackEntity['status'];
+  status: FeedbackEntity['status'];
   @ApiPropertyOptional({ type: () => UserCorrectedJsonDto })
   userCorrectedJson?: ProcessingResult;
 }

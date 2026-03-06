@@ -17,7 +17,7 @@ export class NlpController {
   }
   @Post()
   async process(@Body() payload: ProcessingDto) {
-    return this._service.parse(payload.text);
+    return this._service.parse(payload.text, payload.owner);
   }
   @Post('trainning/categories')
   async categories(@Body() payload: TrainingSamplesDto) {
