@@ -22,8 +22,8 @@ export class TrainingService {
     this._logger.log('TrainingService Initialized');
   }
 
-  // @Cron('0/30 * * * * *', { waitForCompletion: true })
-  @Cron('0 0 0 * * *', { waitForCompletion: true })
+  @Cron('0/30 * * * * *', { waitForCompletion: true })
+  // @Cron('0 0 0 * * *', { waitForCompletion: true })
   async train() {
     this._logger.verbose('Starting training service');
 

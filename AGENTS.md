@@ -107,3 +107,17 @@ Status atual:
 1. Melhorar desambiguacao quando ha mais de duas contas na mesma frase.
 
 - Priorizar conta de origem/destino por proximidade dos verbos de transferencia.
+
+## Agent skills
+
+### Issue tracker
+
+Issues ficam em `rodcordeiro/banky-nlp` e devem integrar o Banky Project #11. Veja `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use o vocabulário canônico de cinco labels. Veja `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Repositório single-context; leia `CONTEXT.md` e ADRs quando existirem. Veja `docs/agents/domain.md`.
